@@ -1,5 +1,6 @@
 import heapq
-from copy import copy, deepcopy
+from copy import deepcopy
+import time
 
 # pre-defined initial puzzle states for the user to choose from
 trivial = [[1, 2, 3],
@@ -90,85 +91,39 @@ def calculateManhattanHeuristic(puzzle) -> int:
                 distance += abs(i-coordinate[0]) + abs(j-coordinate[1])
                 
     return int(distance)
-  
-# function to create a new node where the empty space is moved up one space            
-def moveUp(initial_node, empty_tile, algorithm):
-    if (empty_tile[0] != 0):
-        # shift empty tile up one space
-        temp_puzzle = deepcopy(initial_node.puzzle)
-        empty_x = empty_tile[0]
-        empty_y = empty_tile[1]
-        shifted = temp_puzzle[empty_x-1][empty_y]
-        temp_puzzle[empty_x][empty_y] = shifted
-        temp_puzzle[empty_x-1][empty_y] = 0
-        
-        # calculate heuristic
-        new_node = Node(temp_puzzle)
-        new_node.setMoves(initial_node.moves+1)
-        if (algorithm == "1"):
-            new_node.setHeuristicH(0)
-        elif (algorithm == "2"):
-            h = calculateMisplacedTiles(new_node.puzzle)
-            new_node.setHeuristicH(h)
-        elif (algorithm == "3"):
-            h = calculateManhattanHeuristic(new_node.puzzle)
-            new_node.setHeuristicH(h)
-            
-        return new_node
-        
-# function to create a new node where the empty space is moved downd one space            
-def moveDown(initial_node, empty_tile, algorithm):
-    if (empty_tile[0] != puzzle_size-1):
-        # shift empty tile down one space
-        temp_puzzle = deepcopy(initial_node.puzzle)
-        empty_x = empty_tile[0]
-        empty_y = empty_tile[1]
-        shifted = temp_puzzle[empty_x+1][empty_y]
-        temp_puzzle[empty_x][empty_y] = shifted
-        temp_puzzle[empty_x+1][empty_y] = 0
-        
-        # calculate heuristics
-        new_node = Node(temp_puzzle)
-        new_node.setMoves(initial_node.moves+1)
-        if (algorithm == "1"):
-            new_node.setHeuristicH(0)
-        elif (algorithm == "2"):
-            h = calculateMisplacedTiles(new_node.puzzle)
-            new_node.setHeuristicH(h)
-        elif (algorithm == "3"):
-            h = calculateManhattanHeuristic(new_node.puzzle)
-            new_node.setHeuristicH(h)
-            
-        return new_node
-    
-        
-# function to create a new node where the empty space is moved to the left one space          
-def moveLeft(initial_node, empty_tile, algorithm):
-    if (empty_tile[1] != 0):
-        # shift empty tile to the left one space
-        temp_puzzle = deepcopy(initial_node.puzzle)
-        empty_x = empty_tile[0]
-        empty_y = empty_tile[1]
-        shifted = temp_puzzle[empty_x][empty_y-1]
-        temp_puzzle[empty_x][empty_y] = shifted
-        temp_puzzle[empty_x][empty_y-1] = 0
-        
-        # calculate heuristics
-        new_node = Node(temp_puzzle)
-        new_node.setMoves(initial_node.moves+1)
-        if (algorithm == "1"):
-            new_node.setHeuristicH(0)
-        elif (algorithm == "2"):
-            h = calculateMisplacedTiles(new_node.puzzle)
-            new_node.setHeuristicH(h)
-        elif (algorithm == "3"):
-            h = calculateManhattanHeuristic(new_node.puzzle)
-            new_node.setHeuristicH(h)
-            
-        return new_node
 
-# function to create a new node where the empty space is moved to the right one space            
-def moveRight(initial_node, empty_tile, algorithm):
+def generateNewNode(initial_node, new_puzzle, algorithm):
+    new_node = Node(new_puzzle)
+    new_node.setMoves(initial_node.moves + 1)
+    
+    if algorithm == "1":
+        new_node.setHeuristicH(0)
+    elif algorithm == "2":
+        h = calculateMisplacedTiles(new_node.puzzle)
+        new_node.setHeuristicH(h)
+    elif algorithm == "3":
+        h = calculateManhattanHeuristic(new_node.puzzle)
+        new_node.setHeuristicH(h)
+        
+    return new_node
+
+def move(initial_node, empty_tile, direction, algorithm):
+    x, y = empty_tile
+    temp_puzle = deepcopy(initial_node.puzzle)
+    
+    if direction == 'up' and x > 0:
+        temp_puzle[x][y], temp_puzle[x-1][y] = temp_puzle[x-1][y], temp_puzle[x][y]
+    elif direction == 'down' and x < puzzle_size - 1:
+        temp_puzle[x][y], temp_puzle[x+1][y] = temp_puzle[x+1][y], temp_puzle[x][y]
+    elif direction == 'left' and y > 0:
+        temp_puzle[x][y], temp_puzle[x][y-1] = temp_puzle[x][y-1], temp_puzle[x][y]
+    elif direction == 'right' and y < puzzle_size - 1:
+        temp_puzle[x][y], temp_puzle[x][y+1] = temp_puzle[x][y+1], temp_puzle[x][y]
+    else:
+        return None
+    
+    return generateNewNode(initial_node, temp_puzle, algorithm)
+  
     if (empty_tile[1] != puzzle_size - 1):
         # shift empty tile to the right one space
         temp_puzzle = deepcopy(initial_node.puzzle)
@@ -207,13 +162,16 @@ def generalSearch(algorithm, puzzle, heuristic):
     num_expanded_nodes = 1
     max_queue_len = 1
     
-    # list to store puzzles that have been traversed/analyzed
-    puzzle_states = []
+    # set to store puzzles that have been traversed/analyzed
+    puzzle_states = set()
     
     while (len(p_queue) > 0):
         # analyze first node for a solution
         max_queue_len = max(len(p_queue), max_queue_len)
         head_node = heapq.heappop(p_queue)
+        
+        # convert the puzle to tuple for checking and storing
+        puzzle_tuple = tuple(map(tuple, head_node.puzzle))
         
         # if the node has the solution print to user max queue size, depth, and algorithm runtime
         if (head_node.solved()):
@@ -227,7 +185,7 @@ def generalSearch(algorithm, puzzle, heuristic):
             print("Answer found at depth: ", head_node.moves)
             return
         # if the node is not one of the already checked puzzle states, we can analyze it and create new states from it
-        if (head_node.puzzle not in puzzle_states):
+        if (puzzle_tuple not in puzzle_states):
             # show user which puzzle is being expanded
             print("The best state to expand with a g_n = ", head_node.moves, "and h_n = ", head_node.h, "is...")
             printPuzzle(head_node.puzzle)
@@ -236,31 +194,31 @@ def generalSearch(algorithm, puzzle, heuristic):
             
             # compute movements here to create new puzzle nodes and add them to a list
             new_nodes = []
-            new_nodes.append(moveDown(head_node, empty_tile_pos, algorithm))
-            new_nodes.append(moveUp(head_node, empty_tile_pos, algorithm))
-            new_nodes.append(moveRight(head_node, empty_tile_pos, algorithm))
-            new_nodes.append(moveLeft(head_node, empty_tile_pos, algorithm))
+            new_nodes.append(move(head_node, empty_tile_pos, 'down', algorithm))
+            new_nodes.append(move(head_node, empty_tile_pos, 'up', algorithm))
+            new_nodes.append(move(head_node, empty_tile_pos, 'right', algorithm))
+            new_nodes.append(move(head_node, empty_tile_pos, 'left', algorithm))
               
             # check that the nodes are not empty and add them to the priority queue
-            for i in range(0, len(new_nodes)):
-                temp = new_nodes[i]
-                if (temp is not None and temp.puzzle not in puzzle_states):
-                    heapq.heappush(p_queue, new_nodes[i])
-                    max_queue_len = max(len(p_queue), max_queue_len)
+            for temp in new_nodes:
+                if temp is not None:
+                    temp_puzzle_tuple = tuple(map(tuple, temp.puzzle))
+                    if temp_puzzle_tuple not in puzzle_states:
+                        heapq.heappush(p_queue, temp)
+                        max_queue_len = max(len(p_queue), max_queue_len)
             
             # add the original node to the list containing already visited puzzles
-            puzzle_states.append(head_node.puzzle)
-            new_nodes.clear()
+            puzzle_states.add(puzzle_tuple)
     
     print("No solution found")
             
 # print the n x n puzzle in its entirety            
 def printPuzzle(puzzle):
-    for i in range(puzzle_size):
-        print(puzzle[i])
+    for row in puzzle:
+        print(" | ".join(map(str, row)))
     print('\n')
     
-    
+
 # main driver code for the program
 def main():
     # get user input to determine if they want to create a custom puzzle or use a default one
@@ -316,6 +274,7 @@ def main():
 def chooseAlgorithm(puzzle):
     algorithm = input("Select an algorithm:\n1. Uniform Cost Search\n2. Misplaced Tile Heuristic"
                       + "\n3. Manhattan Distance Heuristic\n")
+    start_time = time.time()
     
     # user has chosen the Uniform Cost Search; heuristic is set to 0
     if algorithm == "1":
@@ -331,6 +290,9 @@ def chooseAlgorithm(puzzle):
         print("You chose: Manhattan Distance Heuristic Search")
         h = calculateManhattanHeuristic(puzzle)
         generalSearch(algorithm, puzzle, h)
+        
+    end_time = time.time()
+    print(f'Time taken: {end_time - start_time:.2f} seconds...')
 
 if __name__ == "__main__":
     main()
